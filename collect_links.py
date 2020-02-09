@@ -24,6 +24,9 @@ import platform
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os.path as osp
+from urllib.parse import urlparse , parse_qs
+
+
 
 
 class CollectLinks:
@@ -77,7 +80,7 @@ class CollectLinks:
         #  Sometimes click fails unreasonably. So tries to click at all cost.
         try:
             w = WebDriverWait(self.browser, 15)
-            elem = w.until(EC.element_to_be_clickable((By.XPATH, xpath)))
+            elem = w.until(EC.element_to_be_clickable((By.CSS_SELECTOR, xpath)))
             elem.click()
         except Exception as e:
             print('Click time out - {}'.format(xpath))
@@ -103,7 +106,7 @@ class CollectLinks:
 
         try:
             # btn_more = self.browser.find_element(By.XPATH, '//input[@value="결과 더보기"]')
-            self.wait_and_click('//input[@id="smb"]')
+            self.wait_and_click('input[value="결과 더보기"]')
 
             for i in range(60):
                 elem.send_keys(Keys.PAGE_DOWN)
@@ -112,26 +115,21 @@ class CollectLinks:
         except ElementNotVisibleException:
             pass
 
-        photo_grid_boxes = self.browser.find_elements(By.XPATH, '//div[@class="rg_bx rg_di rg_el ivg-i"]')
+        imgs = self.browser.find_elements(By.CSS_SELECTOR, 'img[src]')
 
         print('Scraping links')
 
         links = []
-
-        for box in photo_grid_boxes:
-            try:
-                imgs = box.find_elements(By.TAG_NAME, 'img')
-
-                for img in imgs:
-                    src = img.get_attribute("src")
-                    if src[0] != 'd':
-                        links.append(src)
-
-            except Exception as e:
-                print('[Exception occurred while collecting links from google] {}'.format(e))
+        try:
+            for img in imgs:
+                src = img.get_attribute("src")
+                if src[0] != 'd':
+                    links.append(src)
+        except Exception as e:
+            print('[Exception occurred while collecting links from google] {}'.format(e))
 
         print('Collect links done. Site: {}, Keyword: {}, Total: {}'.format('google', keyword, len(links)))
-        self.browser.close()
+        # self.browser.close()
 
         return set(links)
 
@@ -190,7 +188,7 @@ class CollectLinks:
 
         print('Scraping links')
 
-        self.wait_and_click('//div[@data-ri="0"]')
+        self.wait_and_click('div[data-ri="0"]')
         time.sleep(1)
 
         links = []
@@ -199,18 +197,25 @@ class CollectLinks:
         last_scroll = 0
         scroll_patience = 0
 
+        w = WebDriverWait(self.browser, 2,0.2)
+
+
         while True:
             try:
-                xpath = '//div[@class="irc_c i8187 immersive-container"]//img[@class="irc_mi"]'
-                imgs = self.browser.find_elements(By.XPATH, xpath)
-
-                for img in imgs:
-                    src = img.get_attribute('src')
-
-                    if src not in links and src is not None:
-                        links.append(src)
-                        print('%d: %s' % (count, src))
-                        count += 1
+                try:
+                    img = self.browser.find_elements_by_css_selector('img.n3VNCb')[1]
+                    def full_resolution(driver):
+                        src = img.get_attribute('src')
+                        return src if not src.startswith('https://encrypted') and not src.startswith('data:') else None
+                    src = w.until(full_resolution)
+                except Exception as e:
+                    print('focus change is failed moving next element')
+                    elem.send_keys(Keys.RIGHT)
+                    continue
+                if src not in links and src is not None:
+                    links.append(src)
+                    print('%d: %s' % (count, src))
+                    count += 1
 
             except StaleElementReferenceException:
                 # print('[Expected Exception - StaleElementReferenceException]')
@@ -247,7 +252,7 @@ class CollectLinks:
 
         print('Scraping links')
 
-        self.wait_and_click('//div[@class="img_area _item"]')
+        self.wait_and_click('div.img_area._item')
         time.sleep(1)
 
         links = []
@@ -256,18 +261,17 @@ class CollectLinks:
         last_scroll = 0
         scroll_patience = 0
 
+        xpath = 'img._image_source'
+        img = self.browser.find_element(By.CSS_SELECTOR, xpath)
+
         while True:
             try:
-                xpath = '//div[@class="image_viewer_wrap _sauImageViewer"]//img[@class="_image_source"]'
-                imgs = self.browser.find_elements(By.XPATH, xpath)
+                src = img.get_attribute('src')
 
-                for img in imgs:
-                    src = img.get_attribute('src')
-
-                    if src not in links and src is not None:
-                        links.append(src)
-                        print('%d: %s' % (count, src))
-                        count += 1
+                if src not in links and src is not None:
+                    links.append(src)
+                    print('%d: %s' % (count, src))
+                    count += 1
 
             except StaleElementReferenceException:
                 # print('[Expected Exception - StaleElementReferenceException]')
